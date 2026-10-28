@@ -1,0 +1,37 @@
+import { createApp } from '../src/app.js';
+import { pool } from '../src/db/client.js';
+
+export const app = createApp();
+
+/** Truncate every table in the public schema (tolerates zero tables). */
+export async function resetDb(): Promise<void> {
+  const { rows } = await pool.query<{ tablename: string }>(
+    `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename NOT LIKE '\\_\\_%' AND tablename <> 'drizzle_migrations'`,
+  );
+  if (rows.length === 0) return;
+  const list = rows.map((r) => `"public"."${r.tablename}"`).join(', ');
+  await pool.query(`TRUNCATE ${list} RESTART IDENTITY CASCADE`);
+}
+
+export async function req(
+  method: string,
+  path: string,
+  opts: { token?: string; json?: unknown; headers?: Record<string, string> } = {},
+): Promise<{ status: number; body: any; headers: Headers }> {
+  const headers: Record<string, string> = { ...opts.headers };
+  if (opts.token) headers.authorization = `Bearer ${opts.token}`;
+  if (opts.json !== undefined) headers['content-type'] = 'application/json';
+  const res = await app.request(path, {
+    method,
+    headers,
+    body: opts.json !== undefined ? JSON.stringify(opts.json) : undefined,
+  });
+  const text = await res.text();
+  let body: any = text;
+  try {
+    body = text ? JSON.parse(text) : null;
+  } catch {
+    /* non-JSON body */
+  }
+  return { status: res.status, body, headers: res.headers };
+}
