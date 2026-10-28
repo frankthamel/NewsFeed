@@ -28,7 +28,7 @@ export const follow = pgTable(
   {
     followerId: text('follower_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
     followeeId: text('followee_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true, precision: 3 }).defaultNow().notNull(),
   },
   (t) => [
     primaryKey({ columns: [t.followerId, t.followeeId] }),
@@ -48,10 +48,10 @@ export const post = pgTable(
     likeCount: integer('like_count').notNull().default(0),
     commentCount: integer('comment_count').notNull().default(0),
     version: integer('version').notNull().default(1),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-    publishedAt: timestamp('published_at', { withTimezone: true }),
-    deletedAt: timestamp('deleted_at', { withTimezone: true }),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true, precision: 3 }).defaultNow().notNull(),
+    publishedAt: timestamp('published_at', { withTimezone: true, precision: 3 }),
+    deletedAt: timestamp('deleted_at', { withTimezone: true, precision: 3 }),
+    updatedAt: timestamp('updated_at', { withTimezone: true, precision: 3 }).defaultNow().notNull(),
   },
   (t) => [index('post_author_published_idx').on(t.authorId, t.publishedAt.desc(), t.id.desc())],
 );
@@ -82,8 +82,8 @@ export const uploadSession = pgTable(
     postId: uuid('post_id').notNull().references(() => post.id, { onDelete: 'cascade' }),
     postType: postTypeEnum('post_type').notNull(),
     status: uploadStatusEnum('status').notNull(),
-    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true, precision: 3 }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true, precision: 3 }).defaultNow().notNull(),
   },
   (t) => [index('upload_session_status_expires_idx').on(t.status, t.expiresAt)],
 );
@@ -94,7 +94,7 @@ export const feedItem = pgTable(
     ownerId: text('owner_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
     postId: uuid('post_id').notNull().references(() => post.id, { onDelete: 'cascade' }),
     authorId: text('author_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true, precision: 3 }).notNull(),
   },
   (t) => [
     primaryKey({ columns: [t.ownerId, t.postId] }),
@@ -109,8 +109,8 @@ export const like = pgTable(
     postId: uuid('post_id').notNull().references(() => post.id, { onDelete: 'cascade' }),
     userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
     liked: boolean('liked').notNull(),
-    clientUpdatedAt: timestamp('client_updated_at', { withTimezone: true }).notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+    clientUpdatedAt: timestamp('client_updated_at', { withTimezone: true, precision: 3 }).notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, precision: 3 }).defaultNow().notNull(),
   },
   (t) => [
     primaryKey({ columns: [t.postId, t.userId] }),
@@ -126,10 +126,10 @@ export const comment = pgTable(
     authorId: text('author_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
     text: text('text').notNull(),
     version: integer('version').notNull().default(1),
-    clientCreatedAt: timestamp('client_created_at', { withTimezone: true }).notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+    clientCreatedAt: timestamp('client_created_at', { withTimezone: true, precision: 3 }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true, precision: 3 }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, precision: 3 }).defaultNow().notNull(),
+    deletedAt: timestamp('deleted_at', { withTimezone: true, precision: 3 }),
   },
   (t) => [index('comment_post_created_idx').on(t.postId, t.createdAt, t.id)],
 );
@@ -143,7 +143,7 @@ export const clientOperation = pgTable(
     outcome: text('outcome').notNull(),
     postId: uuid('post_id'),
     commentId: uuid('comment_id'),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true, precision: 3 }).defaultNow().notNull(),
   },
   (t) => [primaryKey({ columns: [t.userId, t.opId] })],
 );

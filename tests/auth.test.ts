@@ -16,6 +16,13 @@ describe('auth', () => {
     expect(me.body).toMatchObject({ username: 'ann', displayName: 'Ann', bio: null, avatarUrl: null });
   });
 
+  it('rejects sign-up without a username', async () => {
+    const r = await req('POST', '/api/auth/sign-up/email', {
+      json: { email: 'nouser@x.dev', password: 'password123', name: 'No User' },
+    });
+    expect(r.status).toBe(400);
+  });
+
   it('sign in returns a fresh token', async () => {
     await signUp({ email: 'b@x.dev', password: 'password123' });
     const r = await req('POST', '/api/auth/sign-in/email', { json: { email: 'b@x.dev', password: 'password123' } });

@@ -1,4 +1,5 @@
 import { betterAuth } from 'better-auth';
+import { APIError, createAuthMiddleware } from 'better-auth/api';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { bearer, openAPI, username } from 'better-auth/plugins';
 import { db } from '../db/client.js';
@@ -16,6 +17,16 @@ export const auth = betterAuth({
     additionalFields: {
       bio: { type: 'string', required: false, input: true },
     },
+  },
+  hooks: {
+    // Username is required at sign-up (the username plugin only makes it optional).
+    before: createAuthMiddleware(async (ctx) => {
+      if (ctx.path !== '/sign-up/email') return;
+      const username = (ctx.body as { username?: unknown } | undefined)?.username;
+      if (typeof username !== 'string' || username.trim() === '') {
+        throw new APIError('BAD_REQUEST', { message: 'username is required' });
+      }
+    }),
   },
   plugins: [bearer(), username(), openAPI()],
 });

@@ -9,8 +9,8 @@ export const user = pgTable('user', {
   email: text('email').notNull().unique(),
   emailVerified: boolean('email_verified').default(false).notNull(),
   image: text('image'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at')
+  createdAt: timestamp('created_at', { precision: 3 }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { precision: 3 })
     .defaultNow()
     .$onUpdate(() => new Date())
     .notNull(),
