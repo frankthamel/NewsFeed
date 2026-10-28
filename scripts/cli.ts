@@ -41,22 +41,39 @@ function npmRun(args: string[]): Promise<number> {
   });
 }
 
-/** Long-running dev server: Ctrl+C stops the child but keeps the CLI alive. */
-function runDevServer(): Promise<number> {
+const SIGINT_GRACE_MS = 2000;
+const SIGKILL_AFTER_MS = 5000;
+
+/**
+ * Long-running dev server. The child stays in the terminal's foreground process group, so a
+ * Ctrl+C reaches it directly; our SIGINT handler only keeps the CLI alive and, as a fallback,
+ * escalates SIGTERM then SIGKILL if the child does not exit.
+ */
+export function runDevServer(): Promise<number> {
   return new Promise((resolve) => {
-    // Own process group so the whole tsx watch tree can be stopped.
-    const child = spawn('npm', ['run', 'dev'], { stdio: 'inherit', detached: true });
+    const child = spawn('npm', ['run', 'dev'], { stdio: 'inherit' });
+    let closed = false;
+    const timers: NodeJS.Timeout[] = [];
     let interrupted = false;
     const onSigint = () => {
       interrupted = true;
-      try {
-        if (child.pid) process.kill(-child.pid, 'SIGTERM');
-      } catch {
-        child.kill('SIGTERM');
-      }
+      if (timers.length > 0) return;
+      timers.push(
+        setTimeout(() => {
+          if (closed) return;
+          child.kill('SIGTERM');
+          timers.push(
+            setTimeout(() => {
+              if (!closed) child.kill('SIGKILL');
+            }, SIGKILL_AFTER_MS),
+          );
+        }, SIGINT_GRACE_MS),
+      );
     };
     process.on('SIGINT', onSigint);
     const finish = (code: number) => {
+      closed = true;
+      timers.forEach(clearTimeout);
       process.removeListener('SIGINT', onSigint);
       resolve(code);
     };
