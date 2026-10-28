@@ -71,13 +71,13 @@ const avatarCompleteRoute = createRoute({
   path: '/me/avatar/complete',
   tags: ['Users'],
   summary: 'Finish an avatar upload and set it as the profile image',
-  description: "Step 2 of the avatar flow. Verifies the object exists in storage with the declared type and size, then sets it as the profile image.",
+  description: "Step 2 of the avatar flow. avatarKey must be the key returned by upload-url (avatars/<your id>/<uuid>.<jpg|png|webp|heic>): a malformed key is 400 VALIDATION_ERROR and another user's key is 403 FORBIDDEN. The object must exist in storage (409 UPLOAD_INCOMPLETE otherwise) and be a jpeg, png, webp or heic image of at most 10 MB (422 MEDIA_MISMATCH otherwise). The key is stored and avatarUrl is resolved against the current public storage endpoint on every read.",
   security,
   middleware: [requireAuth] as const,
   request: { body: { required: true, content: json(AvatarCompleteSchema) } },
   responses: {
     200: { description: 'Updated profile', content: json(ProfileSchema) },
-    ...errorResponses(400, 401, 403, 409),
+    ...errorResponses(400, 401, 403, 409, 422),
   },
 });
 

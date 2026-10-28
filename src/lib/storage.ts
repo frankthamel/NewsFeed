@@ -78,6 +78,17 @@ export async function deleteObjects(keys: string[]): Promise<void> {
   }
 }
 
-export function publicUrl(key: string): string {
-  return `${env.S3_PUBLIC_ENDPOINT}/${env.S3_BUCKET}/${key}`;
+/** Public URL for an object key, built from the endpoint in effect now (not at upload time). */
+export function publicUrl(key: string, base: string = env.S3_PUBLIC_ENDPOINT): string {
+  return `${base}/${env.S3_BUCKET}/${key}`;
+}
+
+/**
+ * The one place a stored `user.image` becomes an API `avatarUrl`. The column holds an object key, resolved
+ * on every read so a changed S3_PUBLIC_ENDPOINT applies without reseeding. Legacy full URLs pass through.
+ */
+export function avatarUrlFor(image: string | null, base: string = env.S3_PUBLIC_ENDPOINT): string | null {
+  if (!image) return null;
+  if (/^https?:\/\//i.test(image)) return image;
+  return publicUrl(image, base);
 }

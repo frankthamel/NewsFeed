@@ -87,6 +87,10 @@ S3_PUBLIC_ENDPOINT=http://<LAN-IP>:9000
 BETTER_AUTH_URL=http://<LAN-IP>:3000
 ```
 
+Switching `S3_PUBLIC_ENDPOINT` needs no reseed: posts store media object keys and users store avatar object keys,
+and every `url` / `avatarUrl` is built from the current endpoint when it is read. (Better Auth's own
+`/api/auth/*` responses show the raw key in `user.image`; use `avatarUrl` from `/api/v1`.)
+
 ## Endpoint overview
 
 All routes below are under `/api/v1` and require a bearer token. Full schemas and examples are in `/docs`.
@@ -112,6 +116,14 @@ All routes below are under `/api/v1` and require a bearer token. Full schemas an
 Limits: image post 1-10 images, each up to 10 MB (jpeg/png/webp/heic); video post exactly 1 video up to 100 MB
 (mp4/quicktime) plus an optional thumbnail. Pagination everywhere: `limit` default 20, max 50, response
 `{ items, nextCursor }`. Posts and comments are soft-deleted.
+
+Avatar: `POST /me/avatar/upload-url` returns an `avatarKey` (`avatars/<your id>/<uuid>.<ext>`) and a presigned
+`PUT` URL. `POST /me/avatar/complete` with that key returns `400 VALIDATION_ERROR` for a malformed key,
+`403 FORBIDDEN` for another user's key, `409 UPLOAD_INCOMPLETE` if nothing was uploaded, and
+`422 MEDIA_MISMATCH` if the stored object is not a jpeg/png/webp/heic image of at most 10 MB.
+
+IDs are UUIDs and are case-insensitive: uppercase ids (e.g. iOS `UUID().uuidString`) are accepted and responses
+always use lowercase.
 
 ## Architecture notes
 

@@ -3,6 +3,7 @@ import type { Db } from '../../db/client.js';
 import { follow, user } from '../../db/schema.js';
 import { AppError } from '../../lib/errors.js';
 import { decodeCursor, toPage } from '../../lib/cursor.js';
+import { avatarUrlFor } from '../../lib/storage.js';
 import { backfillFeed, removeFromFeed } from '../feed/fanout.js';
 import type { UserSummary } from '../users/schemas.js';
 
@@ -74,7 +75,7 @@ export async function listFollows(
       id: user.id,
       username: user.username,
       displayName: user.name,
-      avatarUrl: user.image,
+      image: user.image,
       followedAt: follow.createdAt,
       viewerFollowee: viewerFollow.followeeId,
     })
@@ -92,7 +93,7 @@ export async function listFollows(
         id: r.id,
         username: r.username!,
         displayName: r.displayName,
-        avatarUrl: r.avatarUrl,
+        avatarUrl: avatarUrlFor(r.image),
         isFollowing: r.viewerFollowee !== null,
       }),
     ),

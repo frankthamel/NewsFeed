@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { randomUUID } from 'node:crypto';
+import { eq } from 'drizzle-orm';
 import { db } from '../src/db/client.js';
-import { follow } from '../src/db/schema.js';
-import { publicUrl } from '../src/lib/storage.js';
-import { req, resetDb, signUp } from './helpers.js';
+import { follow, user } from '../src/db/schema.js';
+import { avatarUrlFor, publicUrl } from '../src/lib/storage.js';
+import { putObjectRaw, req, resetDb, signUp } from './helpers.js';
 
 beforeEach(resetDb);
 
@@ -110,6 +112,77 @@ describe('avatar', () => {
     const r = await req('POST', '/api/v1/me/avatar/complete', { token: b.token, json: { avatarKey: up.avatarKey } });
     expect(r.status).toBe(403);
     expect(r.body.error.code).toBe('FORBIDDEN');
+  });
+
+  async function completedAvatar(a: { token: string; user: { id: string } }) {
+    const up = await uploadAvatar(a.token);
+    await fetch(up.url, { method: up.method, headers: up.headers, body: Buffer.alloc(321, 7) });
+    const done = await req('POST', '/api/v1/me/avatar/complete', { token: a.token, json: { avatarKey: up.avatarKey } });
+    expect(done.status).toBe(200);
+    return { key: up.avatarKey, done };
+  }
+
+  it('stores the object key and resolves the URL at read time everywhere', async () => {
+    const a = await signUp();
+    const b = await signUp();
+    const { key, done } = await completedAvatar(a);
+    const [row] = await db.select({ image: user.image }).from(user).where(eq(user.id, a.user.id));
+    expect(row!.image).toBe(key);
+    expect(done.body.avatarUrl).toBe(publicUrl(key));
+
+    await req('PUT', `/api/v1/users/${a.user.id}/follow`, { token: b.token });
+    const me = await req('GET', '/api/v1/me', { token: a.token });
+    const profile = await req('GET', `/api/v1/users/${a.user.id}`, { token: b.token });
+    const search = await req('GET', `/api/v1/users?search=${a.user.username}`, { token: b.token });
+    const following = await req('GET', `/api/v1/users/${b.user.id}/following`, { token: b.token });
+    await req('POST', '/api/v1/posts', { token: a.token, json: { type: 'text', text: 'hi' } });
+    const posts = await req('GET', `/api/v1/users/${a.user.id}/posts`, { token: b.token });
+    for (const url of [
+      me.body.avatarUrl,
+      profile.body.avatarUrl,
+      search.body.items[0].avatarUrl,
+      following.body.items[0].avatarUrl,
+      posts.body.items[0].author.avatarUrl,
+    ]) {
+      expect(url).toBe(publicUrl(key));
+    }
+  });
+
+  it('avatarUrlFor follows the public endpoint and passes legacy URLs through', () => {
+    const key = 'avatars/u1/0b0f6d52-4f0e-4a43-9c5e-0b3f1a7d9e11.jpg';
+    expect(avatarUrlFor(key, 'http://192.168.1.20:9000')).toMatch(new RegExp(`^http://192\\.168\\.1\\.20:9000/.+/${key}$`));
+    expect(avatarUrlFor(key)).toBe(publicUrl(key));
+    expect(avatarUrlFor('http://localhost:9000/b/old.jpg', 'http://10.0.0.1:9000')).toBe('http://localhost:9000/b/old.jpg');
+    expect(avatarUrlFor(null)).toBeNull();
+  });
+
+  it('malformed or traversal keys are 400 VALIDATION_ERROR', async () => {
+    const a = await signUp();
+    for (const avatarKey of [
+      `avatars/${a.user.id}/../../posts/x`,
+      `avatars/${a.user.id}/${randomUUID()}.gif`,
+      `avatars/${a.user.id}/not-a-uuid.jpg`,
+      `avatars/${a.user.id}/${randomUUID()}.jpg/extra`,
+    ]) {
+      const r = await req('POST', '/api/v1/me/avatar/complete', { token: a.token, json: { avatarKey } });
+      expect(r.status, avatarKey).toBe(400);
+      expect(r.body.error.code).toBe('VALIDATION_ERROR');
+    }
+  });
+
+  it('an uploaded object with a non-image type or oversize is 422 MEDIA_MISMATCH', async () => {
+    const a = await signUp();
+    const textKey = `avatars/${a.user.id}/${randomUUID()}.jpg`;
+    await putObjectRaw(textKey, 'text/html', Buffer.from('<script>alert(1)</script>'));
+    const r = await req('POST', '/api/v1/me/avatar/complete', { token: a.token, json: { avatarKey: textKey } });
+    expect(r.status).toBe(422);
+    expect(r.body.error.code).toBe('MEDIA_MISMATCH');
+
+    const bigKey = `avatars/${a.user.id}/${randomUUID()}.png`;
+    await putObjectRaw(bigKey, 'image/png', Buffer.alloc(10_485_761));
+    const big = await req('POST', '/api/v1/me/avatar/complete', { token: a.token, json: { avatarKey: bigKey } });
+    expect(big.status).toBe(422);
+    expect((await req('GET', '/api/v1/me', { token: a.token })).body.avatarUrl).toBeNull();
   });
 
   it('complete before upload is 409 UPLOAD_INCOMPLETE', async () => {

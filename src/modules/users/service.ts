@@ -3,8 +3,8 @@ import type { Db } from '../../db/client.js';
 import { follow, post, user } from '../../db/schema.js';
 import { AppError } from '../../lib/errors.js';
 import { decodeCursor, toPage } from '../../lib/cursor.js';
-import { headObject, publicUrl } from '../../lib/storage.js';
-import type { UserProfile, UserSummary } from './schemas.js';
+import { avatarUrlFor, headObject } from '../../lib/storage.js';
+import { IMAGE_TYPES, MAX_IMAGE_BYTES, type UserProfile, type UserSummary } from './schemas.js';
 
 type UserRow = typeof user.$inferSelect;
 
@@ -14,13 +14,13 @@ export function toProfile(row: UserRow) {
     username: row.username!,
     displayName: row.name,
     bio: row.bio,
-    avatarUrl: row.image,
+    avatarUrl: avatarUrlFor(row.image),
     createdAt: row.createdAt.toISOString(),
   };
 }
 
 function toSummary(row: UserRow): UserSummary {
-  return { id: row.id, username: row.username!, displayName: row.name, avatarUrl: row.image };
+  return { id: row.id, username: row.username!, displayName: row.name, avatarUrl: avatarUrlFor(row.image) };
 }
 
 export async function getUserSummaries(db: Db, ids: string[]): Promise<Map<string, UserSummary>> {
@@ -90,13 +90,23 @@ async function getRow(db: Db, userId: string) {
   return toProfile(row);
 }
 
+/** The shape upload-url hands out: avatars/<owner id>/<uuid>.<ext>. Anything else never reaches storage. */
+const AVATAR_KEY_RE = /^avatars\/([A-Za-z0-9_-]+)\/[0-9a-f-]{36}\.(jpg|png|webp|heic)$/;
+
 export async function completeAvatar(db: Db, userId: string, avatarKey: string) {
-  if (!avatarKey.startsWith(`avatars/${userId}/`)) {
-    throw new AppError(403, 'FORBIDDEN', 'Avatar key does not belong to you');
-  }
+  const m = AVATAR_KEY_RE.exec(avatarKey);
+  if (!m) throw new AppError(400, 'VALIDATION_ERROR', 'Malformed avatar key');
+  if (m[1] !== userId) throw new AppError(403, 'FORBIDDEN', 'Avatar key does not belong to you');
   const head = await headObject(avatarKey);
   if (!head) throw new AppError(409, 'UPLOAD_INCOMPLETE', 'Avatar has not been uploaded');
-  const [row] = await db.update(user).set({ image: publicUrl(avatarKey) }).where(eq(user.id, userId)).returning();
+  if (!(IMAGE_TYPES as readonly string[]).includes(head.contentType) || head.sizeBytes > MAX_IMAGE_BYTES) {
+    throw new AppError(422, 'MEDIA_MISMATCH', 'Avatar must be a jpeg, png, webp or heic image of at most 10 MB', {
+      contentType: head.contentType,
+      sizeBytes: head.sizeBytes,
+    });
+  }
+  // Store the key, not a URL: avatarUrlFor resolves it against the current public endpoint on read.
+  const [row] = await db.update(user).set({ image: avatarKey }).where(eq(user.id, userId)).returning();
   if (!row) throw new AppError(401, 'UNAUTHORIZED', 'Authentication required');
   return toProfile(row);
 }
