@@ -15,6 +15,13 @@
       "when": 1793204592543,
       "tag": "0001_natural_blonde_phantom",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793205397959,
+      "tag": "0002_light_winter_soldier",
+      "breakpoints": true
     }
   ]
 }

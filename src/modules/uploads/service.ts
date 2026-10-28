@@ -29,9 +29,9 @@ export async function startUpload(db: Db, userId: string, body: StartUploadBody)
       objectKey: `posts/${postId}/${id}.${extFor(f.contentType)}`,
       contentType: f.contentType,
       sizeBytes: f.sizeBytes,
-      // Stored as declared; the columns are NOT NULL so an omitted dimension is 0.
-      width: f.width ?? 0,
-      height: f.height ?? 0,
+      // Stored as declared; omitted values stay null.
+      width: f.width ?? null,
+      height: f.height ?? null,
       durationSec: f.durationSec ?? null,
       position,
     };

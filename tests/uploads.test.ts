@@ -51,6 +51,15 @@ describe('media uploads', () => {
     expect(c.body.media.map((m: any) => m.kind)).toEqual(['video', 'thumbnail']);
   });
 
+  it('omitted width/height/duration are stored and served as null', async () => {
+    const a = await signUp();
+    const s = await start(a.token, { type: 'image', files: [{ kind: 'image', contentType: 'image/png', sizeBytes: 10 }] });
+    await uploadFiles(s.body, [Buffer.alloc(10, 1)]);
+    const c = await complete(a.token, s.body.uploadId);
+    expect(c.status).toBe(200);
+    expect(c.body.media[0]).toMatchObject({ width: null, height: null, durationSec: null });
+  });
+
   it('missing file -> 409 naming it, then succeeds after upload', async () => {
     const a = await signUp();
     const s = await start(a.token, { type: 'image', files: [img(10), img(20)] });
