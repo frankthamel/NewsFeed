@@ -35,3 +35,23 @@ export async function req(
   }
   return { status: res.status, body, headers: res.headers };
 }
+
+let counter = 0;
+
+export async function signUp(
+  overrides: Partial<{ email: string; password: string; name: string; username: string }> = {},
+): Promise<{ token: string; user: { id: string; username: string; name: string } }> {
+  const n = `${Date.now().toString(36)}${counter++}`;
+  const body = {
+    email: `user${n}@test.dev`,
+    password: 'password123',
+    name: `User ${n}`,
+    username: `user${n}`,
+    ...overrides,
+  };
+  const r = await req('POST', '/api/auth/sign-up/email', { json: body });
+  if (r.status !== 200) throw new Error(`signUp failed: ${r.status} ${JSON.stringify(r.body)}`);
+  const token = r.headers.get('set-auth-token');
+  if (!token) throw new Error('signUp: no set-auth-token header');
+  return { token, user: { id: r.body.user.id, username: r.body.user.username, name: r.body.user.name } };
+}

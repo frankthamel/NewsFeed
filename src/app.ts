@@ -2,10 +2,11 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import { swaggerUI } from '@hono/swagger-ui';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
+import { auth } from './auth/auth.js';
+import { usersRoutes } from './modules/users/routes.js';
 import { onError, onNotFound, validationHook } from './lib/errors.js';
 
-// Placeholder; finalized in Task 2.
-export type AuthUser = { id: string; name: string; email: string };
+export type AuthUser = { id: string; username: string; name: string };
 export type AppEnv = { Variables: { user: AuthUser } };
 
 export function createApp(): OpenAPIHono<AppEnv> {
@@ -26,14 +27,29 @@ export function createApp(): OpenAPIHono<AppEnv> {
 
   app.get('/health', (c) => c.json({ status: 'ok' }));
 
-  app.get('/openapi.json', (c) =>
-    c.json(
-      app.getOpenAPI31Document({
-        openapi: '3.1.0',
-        info: { title: 'NewsFeed API', version: '1.0.0' },
-      }),
-    ),
-  );
+  app.on(['GET', 'POST'], '/api/auth/*', (c) => auth.handler(c.req.raw));
+
+  app.route('/api/v1', usersRoutes());
+
+  type AuthSpec = { paths?: Record<string, Record<string, unknown>> };
+  let authSpec: Promise<AuthSpec> | undefined;
+  app.get('/openapi.json', async (c) => {
+    const doc = app.getOpenAPI31Document({
+      openapi: '3.1.0',
+      info: { title: 'NewsFeed API', version: '1.0.0' },
+    });
+    authSpec ??= auth.api.generateOpenAPISchema() as unknown as Promise<AuthSpec>;
+    const spec = await authSpec;
+    const paths: Record<string, unknown> = (doc.paths ??= {});
+    for (const [path, item] of Object.entries(spec.paths ?? {})) {
+      const tagged: Record<string, unknown> = {};
+      for (const [method, op] of Object.entries(item)) {
+        tagged[method] = op && typeof op === 'object' ? { ...op, tags: ['Auth'] } : op;
+      }
+      paths[`/api/auth${path}`] = tagged;
+    }
+    return c.json(doc);
+  });
   app.get('/docs', swaggerUI({ url: '/openapi.json' }));
 
   return app;
