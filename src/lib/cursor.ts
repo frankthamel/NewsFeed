@@ -8,6 +8,9 @@ export function encodeCursor(c: Cursor): string {
   return Buffer.from(JSON.stringify({ t: c.t, id: c.id })).toString('base64url');
 }
 
+const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z$/;
+const ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
 export function decodeCursor(s: string): Cursor {
   const invalid = () => new AppError(400, 'INVALID_CURSOR', 'Invalid cursor');
   if (!/^[A-Za-z0-9_-]+$/.test(s)) throw invalid();
@@ -18,11 +21,11 @@ export function decodeCursor(s: string): Cursor {
   } catch {
     throw invalid();
   }
-  if (!parsed || typeof parsed !== 'object') throw invalid();
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw invalid();
 
   const { t, id } = parsed as Record<string, unknown>;
-  if (typeof t !== 'string' || typeof id !== 'string' || id.length === 0) throw invalid();
-  if (Number.isNaN(Date.parse(t))) throw invalid();
+  if (typeof t !== 'string' || !ISO_UTC.test(t) || Number.isNaN(Date.parse(t))) throw invalid();
+  if (typeof id !== 'string' || !ID_PATTERN.test(id)) throw invalid();
 
   return { t, id };
 }
