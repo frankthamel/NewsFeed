@@ -47,6 +47,21 @@ describe('decodeCursor strict validation', () => {
     );
   });
 
+  it.each([
+    ['2026-02-31T10:00:00Z', 'day 31 in February'],
+    ['2026-02-30T10:00:00Z', 'day 30 in February'],
+    ['2026-01-01T24:00:00Z', 'hour 24'],
+  ])('rejects calendar-invalid timestamp %s (%s)', (t) => {
+    expect(() => decodeCursor(enc({ t, id: 'a' }))).toThrowError(
+      expect.objectContaining({ code: 'INVALID_CURSOR', status: 400 }),
+    );
+  });
+
+  it('accepts a leap day', () => {
+    const c = { t: '2028-02-29T10:00:00Z', id: 'a' };
+    expect(decodeCursor(enc(c))).toEqual(c);
+  });
+
   it('accepts a 64-character id and fractional-second UTC timestamps', () => {
     const c = { t: '2026-10-28T10:00:00.123456Z', id: 'a'.repeat(64) };
     expect(decodeCursor(encodeCursor(c))).toEqual(c);

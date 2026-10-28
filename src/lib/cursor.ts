@@ -24,7 +24,10 @@ export function decodeCursor(s: string): Cursor {
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw invalid();
 
   const { t, id } = parsed as Record<string, unknown>;
-  if (typeof t !== 'string' || !ISO_UTC.test(t) || Number.isNaN(Date.parse(t))) throw invalid();
+  if (typeof t !== 'string' || !ISO_UTC.test(t)) throw invalid();
+  const ms = Date.parse(t);
+  // Round-trip: V8 rolls invalid dates over (2026-02-31 -> March 3), which Postgres rejects.
+  if (Number.isNaN(ms) || new Date(ms).toISOString().slice(0, 19) !== t.slice(0, 19)) throw invalid();
   if (typeof id !== 'string' || !ID_PATTERN.test(id)) throw invalid();
 
   return { t, id };
