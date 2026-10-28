@@ -110,7 +110,12 @@ export async function expireStaleUploads(db: Db): Promise<number> {
   return n;
 }
 
-export async function completeUpload(db: Db, userId: string, uploadId: string): Promise<FeedItem> {
+export async function completeUpload(
+  db: Db,
+  userId: string,
+  uploadId: string,
+  options?: { now?: Date },
+): Promise<FeedItem> {
   const s = await loadOwnedSession(db, userId, uploadId);
   if (s.status === 'completed') return servePost(db, userId, s.postId);
 
@@ -141,7 +146,7 @@ export async function completeUpload(db: Db, userId: string, uploadId: string): 
   await db.transaction(async (tx) => {
     const [locked] = await tx.select().from(uploadSession).where(eq(uploadSession.id, s.id)).for('update');
     if (!locked || locked.status !== 'open') return; // completed concurrently (or gone): re-checked below
-    const now = new Date();
+    const now = options?.now ?? new Date();
     await tx.update(media).set({ uploaded: true }).where(eq(media.postId, s.postId));
     await tx
       .update(post)

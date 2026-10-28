@@ -22,6 +22,7 @@ export async function createTextPost(
   db: Db,
   userId: string,
   input: { text: string; clientOpId?: string },
+  options?: { now?: Date },
 ): Promise<{ post: FeedItem; created: boolean }> {
   const postId = await db.transaction(async (tx) => {
     const id = randomUUID();
@@ -39,7 +40,7 @@ export async function createTextPost(
         return { id: existing?.postId ?? null, created: false };
       }
     }
-    const publishedAt = new Date();
+    const publishedAt = options?.now ?? new Date();
     await tx.insert(post).values({
       id,
       authorId: userId,
