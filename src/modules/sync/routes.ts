@@ -10,7 +10,34 @@ const json = <T extends object>(schema: T) => ({ 'application/json': { schema } 
 
 const SyncBodySchema = z
   .object({ operations: z.array(OperationSchema).min(1).max(100) })
-  .openapi('SyncBody');
+  .openapi('SyncBody', {
+    example: {
+      operations: [
+        {
+          opId: '11111111-1111-4111-8111-111111111111',
+          type: 'like',
+          postId: '22222222-2222-4222-8222-222222222222',
+          clientTimestamp: '2026-10-28T09:30:00.000Z',
+        },
+        {
+          opId: '33333333-3333-4333-8333-333333333333',
+          type: 'comment.create',
+          postId: '22222222-2222-4222-8222-222222222222',
+          commentId: '44444444-4444-4444-8444-444444444444',
+          text: 'Written offline',
+          clientTimestamp: '2026-10-28T09:31:00.000Z',
+        },
+        {
+          opId: '55555555-5555-4555-8555-555555555555',
+          type: 'comment.edit',
+          commentId: '44444444-4444-4444-8444-444444444444',
+          text: 'Written offline (edited)',
+          baseVersion: 1,
+          clientTimestamp: '2026-10-28T09:32:00.000Z',
+        },
+      ],
+    },
+  });
 const SyncResponseSchema = z.object({ results: z.array(OpResultSchema) }).openapi('SyncResponse');
 
 const syncRoute = createRoute({
@@ -18,6 +45,7 @@ const syncRoute = createRoute({
   path: '/sync',
   tags: ['Sync'],
   summary: 'Apply a batch of offline operations in order (each idempotent on opId)',
+  description: "Replays up to 100 operations queued while offline (like, unlike, comment.create, comment.edit, comment.delete) in order, so a create can be followed by an edit or delete of the same comment. Each operation is idempotent on opId and gets its own OpResult, in input order; one failing operation never fails the batch. Statuses: applied, duplicate (current canonical state returned), superseded (newer like/unlike already stored), conflict (stale baseVersion), rejected (see error.code). Timestamps more than 60 s in the future are clamped to server time. Always overwrite local state with each result's 'canonical'.",
   security: [{ bearerAuth: [] }],
   middleware: [requireAuth] as const,
   request: { body: { required: true, content: json(SyncBodySchema) } },

@@ -12,6 +12,7 @@ const feedRoute = createRoute({
   path: '/feed',
   tags: ['Feed'],
   summary: 'Get the home feed, newest first',
+  description: "Pre-computed (fan-out on write) home feed of the caller's own and followed users' posts. Keyset cursor pagination: default limit 20, max 50; new posts arriving while scrolling never cause duplicates or gaps.",
   security: [{ bearerAuth: [] }],
   middleware: [requireAuth] as const,
   request: { query: PageQuerySchema },

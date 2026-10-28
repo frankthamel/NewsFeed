@@ -75,7 +75,14 @@ export const ClientOpBodySchema = z.object(clientOp).openapi('ClientOpBody');
 
 export const CreateCommentBodySchema = z
   .object({ id: z.string().uuid(), text: CommentText, ...clientOp })
-  .openapi('CreateCommentBody');
+  .openapi('CreateCommentBody', {
+    example: {
+      id: '5b0f6d52-4f0e-4a43-9c5e-0b3f1a7d9e11',
+      text: 'Great photo!',
+      clientOpId: '0c9d2c3e-7a58-4c1b-8d57-6d7a1f0b2a90',
+      clientTimestamp: '2026-10-28T09:30:00.000Z',
+    },
+  });
 
 export const EditCommentBodySchema = z
   .object({ text: CommentText, baseVersion: z.number().int().min(1), ...clientOp })

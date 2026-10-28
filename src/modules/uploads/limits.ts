@@ -27,7 +27,16 @@ export const StartUploadSchema = z
       )
       .max(20),
   })
-  .openapi('StartUpload');
+  .openapi('StartUpload', {
+    example: {
+      type: 'image',
+      text: 'Weekend hike',
+      files: [
+        { kind: 'image', contentType: 'image/jpeg', sizeBytes: 2_345_678, width: 4032, height: 3024 },
+        { kind: 'image', contentType: 'image/png', sizeBytes: 812_345, width: 1080, height: 1080 },
+      ],
+    },
+  });
 export type StartUploadBody = z.infer<typeof StartUploadSchema>;
 
 const bad = (reason: string): never => {
