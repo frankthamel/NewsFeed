@@ -4,12 +4,12 @@ import type { Db, Tx } from '../../db/client.js';
 import { media, post, uploadSession } from '../../db/schema.js';
 import { AppError } from '../../lib/errors.js';
 import { deleteObjects, extFor, headObject, presignPut } from '../../lib/storage.js';
+import { isUuid } from '../../lib/uuid.js';
 import { fanOutPost } from '../feed/fanout.js';
 import type { FeedItem } from '../posts/schemas.js';
 import { serializePosts } from '../posts/serialize.js';
 import { UPLOAD_TTL_MS, validateFiles, type StartUploadBody } from './limits.js';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const notFound = () => new AppError(404, 'UPLOAD_NOT_FOUND', 'Upload not found');
 
 export async function startUpload(db: Db, userId: string, body: StartUploadBody) {
@@ -71,7 +71,7 @@ export async function startUpload(db: Db, userId: string, body: StartUploadBody)
 }
 
 async function loadOwnedSession(db: Db | Tx, userId: string, uploadId: string) {
-  if (!UUID_RE.test(uploadId)) throw notFound();
+  if (!isUuid(uploadId)) throw notFound();
   const [s] = await db.select().from(uploadSession).where(eq(uploadSession.id, uploadId));
   if (!s || s.ownerId !== userId) throw notFound();
   return s;

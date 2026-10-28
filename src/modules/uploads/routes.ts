@@ -3,14 +3,15 @@ import { requireAuth } from '../../auth/middleware.js';
 import type { AppEnv } from '../../app.js';
 import { db } from '../../db/client.js';
 import { errorResponses } from '../../lib/openapi.js';
+import { UuidLike } from '../../lib/uuid.js';
 import { FeedItemSchema } from '../posts/schemas.js';
 import { StartUploadSchema } from './limits.js';
 import { completeUpload, getUpload, startUpload } from './service.js';
 
 const security = [{ bearerAuth: [] }];
 const json = <T extends object>(schema: T) => ({ 'application/json': { schema } });
-// Plain string (not uuid): a malformed id must yield 404 UPLOAD_NOT_FOUND, not 400.
-const UploadIdParam = z.object({ uploadId: z.string() });
+// Lenient (not validated): a malformed id must yield 404 UPLOAD_NOT_FOUND, not 400.
+const UploadIdParam = z.object({ uploadId: UuidLike });
 const Kind = z.enum(['image', 'video', 'thumbnail']);
 
 const StartResponseSchema = z

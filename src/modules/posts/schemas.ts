@@ -1,4 +1,5 @@
 import { z } from '@hono/zod-openapi';
+import { Uuid, UuidLike } from '../../lib/uuid.js';
 import { UserSummarySchema } from '../users/schemas.js';
 
 export const MediaSchema = z
@@ -51,14 +52,14 @@ export const CreatePostSchema = z
   .object({
     type: z.literal('text'),
     text: z.string().min(1).max(5000),
-    clientOpId: z.string().uuid().optional(),
+    clientOpId: Uuid.optional(),
   })
   .openapi('CreatePost');
 
-export const PostIdParamSchema = z.object({ id: z.string().uuid() });
+export const PostIdParamSchema = z.object({ id: Uuid });
 
 /** Lenient id param for read routes: a non-uuid id is a 404, not a validation error. */
-export const PostLookupParamSchema = z.object({ id: z.string() });
+export const PostLookupParamSchema = z.object({ id: UuidLike });
 
 export const PostDetailSchema = FeedItemSchema.extend({
   author: UserSummarySchema.extend({
@@ -72,7 +73,8 @@ export const LikerSchema = UserSummarySchema.extend({ likedAt: z.string() }).ope
 
 export const RefreshBodySchema = z
   .object({
-    posts: z.array(z.object({ id: z.string(), version: z.number().int() })).min(1).max(200),
+    // Lenient ids: a non-uuid id is reported in `deleted`, not rejected.
+    posts: z.array(z.object({ id: UuidLike, version: z.number().int() })).min(1).max(200),
   })
   .openapi('RefreshBody');
 

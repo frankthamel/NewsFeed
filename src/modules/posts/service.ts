@@ -4,17 +4,16 @@ import type { Db } from '../../db/client.js';
 import { clientOperation, comment, like, post, user } from '../../db/schema.js';
 import { decodeCursor, toPage, type Cursor } from '../../lib/cursor.js';
 import { AppError } from '../../lib/errors.js';
+import { isUuid } from '../../lib/uuid.js';
 import { fanOutPost, removePostFromFeeds } from '../feed/fanout.js';
 import { getUserProfile, getUserSummaries } from '../users/service.js';
 import type { FeedItem, PostDetail } from './schemas.js';
 import { serializePosts, toComment } from './serialize.js';
 
-export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 /** Decode a cursor whose id is compared against a uuid column. */
 export function decodeUuidCursor(s: string): Cursor {
   const c = decodeCursor(s);
-  if (!UUID_RE.test(c.id)) throw new AppError(400, 'INVALID_CURSOR', 'Invalid cursor');
+  if (!isUuid(c.id)) throw new AppError(400, 'INVALID_CURSOR', 'Invalid cursor');
   return c;
 }
 
@@ -99,7 +98,7 @@ export async function listUserPosts(
 }
 
 async function assertPostVisible(db: Db, postId: string): Promise<void> {
-  if (!UUID_RE.test(postId)) throw new AppError(404, 'POST_NOT_FOUND', 'Post not found');
+  if (!isUuid(postId)) throw new AppError(404, 'POST_NOT_FOUND', 'Post not found');
   const [p] = await db
     .select({ id: post.id })
     .from(post)
@@ -108,7 +107,7 @@ async function assertPostVisible(db: Db, postId: string): Promise<void> {
 }
 
 export async function getPostDetail(db: Db, viewerId: string, postId: string): Promise<PostDetail> {
-  if (!UUID_RE.test(postId)) throw new AppError(404, 'POST_NOT_FOUND', 'Post not found');
+  if (!isUuid(postId)) throw new AppError(404, 'POST_NOT_FOUND', 'Post not found');
   const [item] = await serializePosts(db, viewerId, [postId]);
   if (!item) throw new AppError(404, 'POST_NOT_FOUND', 'Post not found');
   const profile = await getUserProfile(db, viewerId, item.author.id);
@@ -181,7 +180,7 @@ export async function refreshPosts(
   const sent = new Map<string, number>();
   for (const p of posts) if (!sent.has(p.id)) sent.set(p.id, p.version);
 
-  const validIds = [...sent.keys()].filter((id) => UUID_RE.test(id));
+  const validIds = [...sent.keys()].filter(isUuid);
   const live = new Map<string, number>();
   if (validIds.length > 0) {
     const rows = await db

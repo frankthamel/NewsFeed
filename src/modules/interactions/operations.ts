@@ -4,7 +4,7 @@ import { clientOperation, comment, like, post } from '../../db/schema.js';
 import type { ErrorCode } from '../../lib/errors.js';
 import type { Comment } from '../posts/schemas.js';
 import { toComment } from '../posts/serialize.js';
-import { UUID_RE } from '../posts/service.js';
+import { isUuid } from '../../lib/uuid.js';
 import { getUserSummaries } from '../users/service.js';
 import { createComment, deleteComment, editComment } from './comments.js';
 import { applyLike } from './likes.js';
@@ -17,7 +17,7 @@ const reject = (code: ErrorCode, message: string): OpOutcome => ({ status: 'reje
 /** Authoritative post state for the app's cache. Missing, pending or non-uuid → `deleted: true` with zero counts. */
 export async function getPostState(db: Db, viewerId: string, postId: string): Promise<PostState> {
   const gone: PostState = { id: postId, likeCount: 0, commentCount: 0, likedByMe: false, version: 0, deleted: true };
-  if (!UUID_RE.test(postId)) return gone;
+  if (!isUuid(postId)) return gone;
   const [p] = await db.select().from(post).where(eq(post.id, postId));
   if (!p || p.status !== 'published') return gone;
   const [l] = await db
@@ -34,8 +34,8 @@ export async function getPostState(db: Db, viewerId: string, postId: string): Pr
   };
 }
 
+/** `commentId` is a valid uuid: applyOperation rejects malformed ids before any canonical read. */
 async function getCommentState(db: Db, commentId: string): Promise<{ postId: string | null; comment: Comment | null }> {
-  if (!UUID_RE.test(commentId)) return { postId: null, comment: null };
   const [c] = await db.select().from(comment).where(eq(comment.id, commentId));
   if (!c) return { postId: null, comment: null };
   if (c.deletedAt) return { postId: c.postId, comment: null };
@@ -107,7 +107,7 @@ export async function applyOperation(db: Db, userId: string, op: Operation): Pro
 
   // Path params are lenient strings; a non-uuid id can't exist, and must never reach a uuid cast.
   // Not recorded in client_operation (its id columns are uuid); a retry gets the same rejection.
-  if (postId !== undefined && !UUID_RE.test(postId)) {
+  if (postId !== undefined && !isUuid(postId)) {
     return {
       opId: op.opId,
       status: 'rejected',
@@ -115,7 +115,7 @@ export async function applyOperation(db: Db, userId: string, op: Operation): Pro
       canonical: { post: await getPostState(db, userId, postId) },
     };
   }
-  if (commentId !== undefined && !UUID_RE.test(commentId)) {
+  if (commentId !== undefined && !isUuid(commentId)) {
     return {
       opId: op.opId,
       status: 'rejected',
