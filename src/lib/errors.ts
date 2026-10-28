@@ -47,6 +47,8 @@ export function onError(err: Error, c: Context) {
       401: 'UNAUTHORIZED',
       403: 'FORBIDDEN',
       404: 'NOT_FOUND',
+      413: 'VALIDATION_ERROR', // payload too large
+      415: 'VALIDATION_ERROR', // unsupported media type
     };
     const code = codes[err.status] ?? 'INTERNAL';
     return c.json(errorBody(code, err.message || 'Request failed'), err.status as ContentfulStatusCode);

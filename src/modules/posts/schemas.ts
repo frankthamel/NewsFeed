@@ -56,9 +56,7 @@ export const CreatePostSchema = z
   })
   .openapi('CreatePost');
 
-export const PostIdParamSchema = z.object({ id: Uuid });
-
-/** Lenient id param for read routes: a non-uuid id is a 404, not a validation error. */
+/** Lenient id param for post routes: a non-uuid id is a 404, not a validation error. */
 export const PostLookupParamSchema = z.object({ id: UuidLike });
 
 export const PostDetailSchema = FeedItemSchema.extend({

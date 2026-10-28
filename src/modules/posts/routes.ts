@@ -11,7 +11,6 @@ import {
   FeedItemSchema,
   LikerSchema,
   PostDetailSchema,
-  PostIdParamSchema,
   PostLookupParamSchema,
   RefreshBodySchema,
   RefreshResponseSchema,
@@ -26,14 +25,14 @@ const createRoute_ = createRoute({
   path: '/posts',
   tags: ['Posts'],
   summary: 'Create a text post (idempotent with clientOpId)',
-  description: "Publishes a text post immediately and fans it out to the author's and followers' feeds. Retrying with the same clientOpId returns the original post with 200 instead of creating a duplicate.",
+  description: "Publishes a text post immediately and fans it out to the author's and followers' feeds. Retrying with the same clientOpId returns the original post with 200 instead of creating a duplicate; if that post has since been deleted, the replay returns 404 POST_NOT_FOUND.",
   security,
   middleware: [requireAuth] as const,
   request: { body: { required: true, content: json(CreatePostSchema) } },
   responses: {
     201: { description: 'Created', content: json(FeedItemSchema) },
     200: { description: 'Replay of an earlier request with the same clientOpId', content: json(FeedItemSchema) },
-    ...errorResponses(400, 401),
+    ...errorResponses(400, 401, 404),
   },
 });
 
@@ -42,13 +41,13 @@ const deleteRoute = createRoute({
   path: '/posts/{id}',
   tags: ['Posts'],
   summary: 'Delete your own post',
-  description: "Soft-deletes the post (author only) and removes it from every feed. Returns 204 with no body.",
+  description: "Soft-deletes the post (author only) and removes it from every feed. Returns 204 with no body. An unknown, already deleted or malformed id is 404 POST_NOT_FOUND.",
   security,
   middleware: [requireAuth] as const,
-  request: { params: PostIdParamSchema },
+  request: { params: PostLookupParamSchema },
   responses: {
     204: { description: 'Deleted' },
-    ...errorResponses(400, 401, 403, 404),
+    ...errorResponses(401, 403, 404),
   },
 });
 
@@ -57,13 +56,13 @@ const userPostsRoute = createRoute({
   path: '/users/{id}/posts',
   tags: ['Posts'],
   summary: "List a user's published posts, newest first",
-  description: "Cursor paginated, newest first (default limit 20, max 50). Pending (unpublished) and deleted posts are never listed.",
+  description: "Cursor paginated, newest first (default limit 20, max 50). Pending (unpublished) and deleted posts are never listed. An unknown user is 404 USER_NOT_FOUND.",
   security,
   middleware: [requireAuth] as const,
   request: { params: UserIdParamSchema, query: PageQuerySchema },
   responses: {
     200: { description: 'Page of posts', content: json(pageSchema(FeedItemSchema)) },
-    ...errorResponses(400, 401),
+    ...errorResponses(400, 401, 404),
   },
 });
 

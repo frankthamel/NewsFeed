@@ -15,6 +15,12 @@ function makeApp() {
     }),
     (c) => c.json({ name: c.req.valid('json').name }, 200),
   );
+  app.get('/too-large', () => {
+    throw new HTTPException(413, { message: 'Payload too large' });
+  });
+  app.get('/unsupported', () => {
+    throw new HTTPException(415, { message: 'Unsupported media type' });
+  });
   app.get('/teapot', () => {
     throw new HTTPException(418, { message: 'teapot' });
   });
@@ -41,5 +47,12 @@ describe('error handling', () => {
     const res = await makeApp().request('/teapot');
     expect(res.status).toBe(418);
     expect((await res.json()).error.code).toBe('INTERNAL');
+  });
+  it('413 and 415 HTTPExceptions keep their status with VALIDATION_ERROR', async () => {
+    for (const [path, status] of [['/too-large', 413], ['/unsupported', 415]] as const) {
+      const res = await makeApp().request(path);
+      expect(res.status).toBe(status);
+      expect((await res.json()).error.code).toBe('VALIDATION_ERROR');
+    }
   });
 });

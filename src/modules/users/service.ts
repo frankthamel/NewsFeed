@@ -31,6 +31,11 @@ export async function getUserSummaries(db: Db, ids: string[]): Promise<Map<strin
   return out;
 }
 
+export async function assertUserExists(db: Db, id: string): Promise<void> {
+  const [row] = await db.select({ id: user.id }).from(user).where(eq(user.id, id));
+  if (!row) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+}
+
 export async function getUserProfile(db: Db, viewerId: string, userId: string): Promise<UserProfile> {
   const [row] = await db.select().from(user).where(eq(user.id, userId));
   if (!row) throw new AppError(404, 'USER_NOT_FOUND', 'User not found');

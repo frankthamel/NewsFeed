@@ -1,4 +1,4 @@
-import './load-env.js';
+import '../src/load-env.js';
 import { pathToFileURL } from 'node:url';
 import { ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';

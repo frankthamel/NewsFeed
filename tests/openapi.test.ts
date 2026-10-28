@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { createApp } from '../src/app.js';
+import { auth } from '../src/auth/auth.js';
 import { app } from './helpers.js';
 
 const TAGS = ['Auth', 'Users', 'Follows', 'Posts', 'Uploads', 'Feed', 'Interactions', 'Sync'];
@@ -55,5 +57,29 @@ describe('OpenAPI document', () => {
     expect(hasExample('/api/v1/posts/uploads')).toBe(true);
     expect(hasExample('/api/v1/sync')).toBe(true);
     expect(hasExample('/api/v1/posts/{id}/comments')).toBe(true);
+  });
+
+  it('declares the statuses the post routes actually return', async () => {
+    const doc = await spec();
+    expect(Object.keys(doc.paths['/api/v1/posts'].post.responses)).toContain('404');
+    const del = Object.keys(doc.paths['/api/v1/posts/{id}'].delete.responses);
+    expect(del).toEqual(expect.arrayContaining(['204', '401', '403', '404']));
+    expect(del).not.toContain('400');
+    expect(Object.keys(doc.paths['/api/v1/users/{id}/posts'].get.responses)).toContain('404');
+    expect(Object.keys(doc.paths['/api/v1/me/avatar/complete'].post.responses)).toContain('422');
+  });
+  it('does not cache a failed Better Auth schema generation', async () => {
+    const fresh = createApp();
+    const spy = vi.spyOn(auth.api, 'generateOpenAPISchema').mockRejectedValueOnce(new Error('boom'));
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      expect((await fresh.request('/openapi.json')).status).toBe(500);
+      const ok = await fresh.request('/openapi.json');
+      expect(ok.status).toBe(200);
+      expect(Object.keys((await ok.json()).paths)).toContain('/api/auth/sign-in/email');
+    } finally {
+      spy.mockRestore();
+      quiet.mockRestore();
+    }
   });
 });

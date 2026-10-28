@@ -6,7 +6,7 @@ import { decodeCursor, toPage, type Cursor } from '../../lib/cursor.js';
 import { AppError } from '../../lib/errors.js';
 import { isUuid } from '../../lib/uuid.js';
 import { fanOutPost, removePostFromFeeds } from '../feed/fanout.js';
-import { getUserProfile, getUserSummaries } from '../users/service.js';
+import { assertUserExists, getUserProfile, getUserSummaries } from '../users/service.js';
 import type { FeedItem, PostDetail } from './schemas.js';
 import { serializePosts, toComment } from './serialize.js';
 
@@ -61,6 +61,7 @@ export async function createTextPost(
 }
 
 export async function deletePost(db: Db, userId: string, postId: string): Promise<void> {
+  if (!isUuid(postId)) throw new AppError(404, 'POST_NOT_FOUND', 'Post not found');
   await db.transaction(async (tx) => {
     const [p] = await tx.select().from(post).where(eq(post.id, postId)).for('update');
     if (!p || p.deletedAt || p.status !== 'published') {
@@ -82,6 +83,7 @@ export async function listUserPosts(
   authorId: string,
   q: { cursor?: string; limit: number },
 ) {
+  await assertUserExists(db, authorId);
   const conds = [eq(post.authorId, authorId), eq(post.status, 'published'), isNull(post.deletedAt)];
   if (q.cursor) {
     const c = decodeUuidCursor(q.cursor);

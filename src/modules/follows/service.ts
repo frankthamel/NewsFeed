@@ -6,13 +6,7 @@ import { decodeCursor, toPage } from '../../lib/cursor.js';
 import { avatarUrlFor } from '../../lib/storage.js';
 import { backfillFeed, removeFromFeed } from '../feed/fanout.js';
 import type { UserSummary } from '../users/schemas.js';
-
-const notFound = () => new AppError(404, 'USER_NOT_FOUND', 'User not found');
-
-async function assertUserExists(db: Db, id: string): Promise<void> {
-  const [row] = await db.select({ id: user.id }).from(user).where(eq(user.id, id));
-  if (!row) throw notFound();
-}
+import { assertUserExists } from '../users/service.js';
 
 async function followerCount(db: Db, userId: string): Promise<number> {
   const [row] = await db.select({ n: count() }).from(follow).where(eq(follow.followeeId, userId));

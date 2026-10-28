@@ -55,7 +55,11 @@ export function createApp(): OpenAPIHono<AppEnv> {
       openapi: '3.1.0',
       info: { title: 'NewsFeed API', version: '1.0.0' },
     });
-    authSpec ??= auth.api.generateOpenAPISchema() as unknown as Promise<AuthSpec>;
+    // Memoized, but a rejection is dropped so the next request retries instead of failing forever.
+    authSpec ??= (auth.api.generateOpenAPISchema() as unknown as Promise<AuthSpec>).catch((e: unknown) => {
+      authSpec = undefined;
+      throw e;
+    });
     const spec = await authSpec;
     const paths: Record<string, unknown> = (doc.paths ??= {});
     for (const [path, item] of Object.entries(spec.paths ?? {})) {

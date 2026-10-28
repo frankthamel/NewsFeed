@@ -139,6 +139,13 @@ describe('delete post', () => {
     expect(row!.deletedAt).not.toBeNull();
     expect(row!.version).toBe(2);
   });
+
+  it('a non-uuid id is 404 POST_NOT_FOUND like every other post route', async () => {
+    const a = await signUp();
+    const r = await req('DELETE', '/api/v1/posts/not-a-uuid', { token: a.token });
+    expect(r.status).toBe(404);
+    expect(r.body.error.code).toBe('POST_NOT_FOUND');
+  });
 });
 
 describe('create post', () => {
@@ -164,6 +171,18 @@ describe('create post', () => {
     expect(new Set(rs.map((r) => r.body.id)).size).toBe(1);
   });
 
+  it('replaying the clientOpId of a since-deleted post is 404 POST_NOT_FOUND', async () => {
+    const b = await signUp();
+    const clientOpId = randomUUID();
+    const first = await createPost(b.token, 'gone soon', { clientOpId });
+    expect(first.status).toBe(201);
+    expect((await req('DELETE', `/api/v1/posts/${first.body.id}`, { token: b.token })).status).toBe(204);
+    const replay = await createPost(b.token, 'gone soon', { clientOpId });
+    expect(replay.status).toBe(404);
+    expect(replay.body.error.code).toBe('POST_NOT_FOUND');
+    expect((await feed(b.token)).items).toEqual([]);
+  });
+
   it('validates text length', async () => {
     const { token } = await signUp();
     expect((await createPost(token, '')).status).toBe(400);
@@ -183,5 +202,14 @@ describe('users/:id/posts', () => {
     const r2 = await req('GET', `/api/v1/users/${b.user.id}/posts?limit=2&cursor=${r1.body.nextCursor}`, { token: a.token });
     expect(r2.body.items.map((i: any) => i.id)).toEqual(ids.slice(2));
     expect(r2.body.nextCursor).toBeNull();
+  });
+
+  it('unknown user is 404 USER_NOT_FOUND, like followers/following', async () => {
+    const a = await signUp();
+    for (const id of ['no-such-user', randomUUID()]) {
+      const r = await req('GET', `/api/v1/users/${id}/posts`, { token: a.token });
+      expect(r.status).toBe(404);
+      expect(r.body.error.code).toBe('USER_NOT_FOUND');
+    }
   });
 });
