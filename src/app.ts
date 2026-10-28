@@ -9,6 +9,7 @@ import { uploadsRoutes } from './modules/uploads/routes.js';
 import { postsRoutes } from './modules/posts/routes.js';
 import { followsRoutes } from './modules/follows/routes.js';
 import { interactionsRoutes } from './modules/interactions/routes.js';
+import { syncRoutes } from './modules/sync/routes.js';
 import { onError, onNotFound, validationHook } from './lib/errors.js';
 
 export type AuthUser = { id: string; username: string; name: string };
@@ -41,6 +42,7 @@ export function createApp(): OpenAPIHono<AppEnv> {
   app.route('/api/v1', feedRoutes());
   app.route('/api/v1', followsRoutes());
   app.route('/api/v1', interactionsRoutes());
+  app.route('/api/v1', syncRoutes());
 
   type AuthSpec = { paths?: Record<string, Record<string, unknown>> };
   let authSpec: Promise<AuthSpec> | undefined;
