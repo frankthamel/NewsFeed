@@ -13,8 +13,10 @@ import {
   PostDetailSchema,
   PostIdParamSchema,
   PostLookupParamSchema,
+  RefreshBodySchema,
+  RefreshResponseSchema,
 } from './schemas.js';
-import { createTextPost, deletePost, getPostDetail, listComments, listLikers, listUserPosts } from './service.js';
+import { createTextPost, deletePost, getPostDetail, listComments, listLikers, listUserPosts, refreshPosts } from './service.js';
 
 const security = [{ bearerAuth: [] }];
 const json = <T extends object>(schema: T) => ({ 'application/json': { schema } });
@@ -104,6 +106,20 @@ const likesRoute = createRoute({
   },
 });
 
+const refreshRoute = createRoute({
+  method: 'post',
+  path: '/posts/refresh',
+  tags: ['Posts'],
+  summary: 'Refresh cached posts: returns changed posts and ids that are gone',
+  security,
+  middleware: [requireAuth] as const,
+  request: { body: { required: true, content: json(RefreshBodySchema) } },
+  responses: {
+    200: { description: 'Changed posts and deleted ids', content: json(RefreshResponseSchema) },
+    ...errorResponses(400, 401),
+  },
+});
+
 export function postsRoutes() {
   const r = new OpenAPIHono<AppEnv>();
 
@@ -124,6 +140,10 @@ export function postsRoutes() {
       200,
     );
   });
+
+  r.openapi(refreshRoute, async (c) =>
+    c.json(await refreshPosts(db, c.var.user.id, c.req.valid('json').posts), 200),
+  );
 
   r.openapi(detailRoute, async (c) =>
     c.json(await getPostDetail(db, c.var.user.id, c.req.valid('param').id), 200),

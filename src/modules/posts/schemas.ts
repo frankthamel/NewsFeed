@@ -69,3 +69,13 @@ export const PostDetailSchema = FeedItemSchema.extend({
 export type PostDetail = z.infer<typeof PostDetailSchema>;
 
 export const LikerSchema = UserSummarySchema.extend({ likedAt: z.string() }).openapi('Liker');
+
+export const RefreshBodySchema = z
+  .object({
+    posts: z.array(z.object({ id: z.string(), version: z.number().int() })).min(1).max(200),
+  })
+  .openapi('RefreshBody');
+
+export const RefreshResponseSchema = z
+  .object({ updated: z.array(FeedItemSchema), deleted: z.array(z.string()) })
+  .openapi('RefreshResponse');

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { Db } from '../../db/client.js';
 import { clientOperation, comment, like, post, user } from '../../db/schema.js';
 import { decodeCursor, toPage, type Cursor } from '../../lib/cursor.js';
@@ -168,4 +168,34 @@ export async function listLikers(
     return u ? [{ ...u, likedAt: r.updatedAt.toISOString() }] : [];
   });
   return { items, nextCursor: page.nextCursor };
+}
+
+/** Compare client-cached versions with the server: changed posts come back whole, gone ones by id. */
+export async function refreshPosts(
+  db: Db,
+  viewerId: string,
+  posts: { id: string; version: number }[],
+): Promise<{ updated: FeedItem[]; deleted: string[] }> {
+  // Dedupe by id, keeping the first occurrence.
+  const sent = new Map<string, number>();
+  for (const p of posts) if (!sent.has(p.id)) sent.set(p.id, p.version);
+
+  const validIds = [...sent.keys()].filter((id) => UUID_RE.test(id));
+  const live = new Map<string, number>();
+  if (validIds.length > 0) {
+    const rows = await db
+      .select({ id: post.id, version: post.version })
+      .from(post)
+      .where(and(inArray(post.id, validIds), eq(post.status, 'published'), isNull(post.deletedAt)));
+    for (const r of rows) live.set(r.id, r.version);
+  }
+
+  const deleted: string[] = [];
+  const changed: string[] = [];
+  for (const [id, version] of sent) {
+    const serverVersion = live.get(id);
+    if (serverVersion === undefined) deleted.push(id);
+    else if (serverVersion !== version) changed.push(id);
+  }
+  return { updated: await serializePosts(db, viewerId, changed), deleted };
 }
