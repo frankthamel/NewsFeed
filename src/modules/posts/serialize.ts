@@ -3,7 +3,31 @@ import type { Db } from '../../db/client.js';
 import { comment, like, media, post } from '../../db/schema.js';
 import { publicUrl } from '../../lib/storage.js';
 import { getUserSummaries } from '../users/service.js';
+import type { UserSummary } from '../users/schemas.js';
 import type { Comment, FeedItem, Media } from './schemas.js';
+
+type CommentRow = {
+  id: string;
+  postId: string;
+  text: string;
+  version: number;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+/** Single mapping from a comment row to the API shape (feed previews and the comments list). */
+export function toComment(c: CommentRow, author: UserSummary): Comment {
+  return {
+    id: c.id,
+    postId: c.postId,
+    author,
+    text: c.text,
+    version: c.version,
+    createdAt: c.createdAt.toISOString(),
+    updatedAt: c.updatedAt.toISOString(),
+    edited: c.version > 1,
+  };
+}
 
 /** Load published, non-deleted posts in the order of `postIds`. Uses a fixed number of queries. */
 export async function serializePosts(db: Db, viewerId: string, postIds: string[]): Promise<FeedItem[]> {
@@ -70,16 +94,7 @@ export async function serializePosts(db: Db, viewerId: string, postIds: string[]
     const author = users.get(c.authorId);
     if (!author) continue;
     const list = commentsBy.get(c.postId) ?? [];
-    list.push({
-      id: c.id,
-      postId: c.postId,
-      author,
-      text: c.text,
-      version: c.version,
-      createdAt: c.createdAt.toISOString(),
-      updatedAt: c.updatedAt.toISOString(),
-      edited: c.version > 1,
-    });
+    list.push(toComment(c, author));
     commentsBy.set(c.postId, list);
   }
 

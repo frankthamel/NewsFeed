@@ -56,3 +56,16 @@ export const CreatePostSchema = z
   .openapi('CreatePost');
 
 export const PostIdParamSchema = z.object({ id: z.string().uuid() });
+
+/** Lenient id param for read routes: a non-uuid id is a 404, not a validation error. */
+export const PostLookupParamSchema = z.object({ id: z.string() });
+
+export const PostDetailSchema = FeedItemSchema.extend({
+  author: UserSummarySchema.extend({
+    followerCount: z.number().int(),
+    isFollowing: z.boolean(),
+  }),
+}).openapi('PostDetail');
+export type PostDetail = z.infer<typeof PostDetailSchema>;
+
+export const LikerSchema = UserSummarySchema.extend({ likedAt: z.string() }).openapi('Liker');

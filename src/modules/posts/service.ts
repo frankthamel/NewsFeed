@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { Db } from '../../db/client.js';
-import { clientOperation, post } from '../../db/schema.js';
+import { clientOperation, comment, like, post, user } from '../../db/schema.js';
 import { decodeCursor, toPage, type Cursor } from '../../lib/cursor.js';
 import { AppError } from '../../lib/errors.js';
 import { fanOutPost, removePostFromFeeds } from '../feed/fanout.js';
-import type { FeedItem } from './schemas.js';
-import { serializePosts } from './serialize.js';
+import { getUserProfile, getUserSummaries } from '../users/service.js';
+import type { FeedItem, PostDetail } from './schemas.js';
+import { serializePosts, toComment } from './serialize.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -94,4 +95,77 @@ export async function listUserPosts(
     .limit(q.limit + 1);
   const page = toPage(rows, q.limit, (r) => ({ t: r.publishedAt!.toISOString(), id: r.id }));
   return { items: await serializePosts(db, viewerId, page.items.map((r) => r.id)), nextCursor: page.nextCursor };
+}
+
+async function assertPostVisible(db: Db, postId: string): Promise<void> {
+  if (!UUID_RE.test(postId)) throw new AppError(404, 'POST_NOT_FOUND', 'Post not found');
+  const [p] = await db
+    .select({ id: post.id })
+    .from(post)
+    .where(and(eq(post.id, postId), eq(post.status, 'published'), isNull(post.deletedAt)));
+  if (!p) throw new AppError(404, 'POST_NOT_FOUND', 'Post not found');
+}
+
+export async function getPostDetail(db: Db, viewerId: string, postId: string): Promise<PostDetail> {
+  if (!UUID_RE.test(postId)) throw new AppError(404, 'POST_NOT_FOUND', 'Post not found');
+  const [item] = await serializePosts(db, viewerId, [postId]);
+  if (!item) throw new AppError(404, 'POST_NOT_FOUND', 'Post not found');
+  const profile = await getUserProfile(db, viewerId, item.author.id);
+  return {
+    ...item,
+    author: { ...item.author, followerCount: profile.followerCount, isFollowing: profile.isFollowing },
+  };
+}
+
+export async function listComments(
+  db: Db,
+  postId: string,
+  q: { cursor?: string; limit: number },
+) {
+  await assertPostVisible(db, postId);
+  const conds = [eq(comment.postId, postId), isNull(comment.deletedAt)];
+  if (q.cursor) {
+    const c = decodeUuidCursor(q.cursor);
+    conds.push(sql`(${comment.createdAt}, ${comment.id}) > (${c.t}::timestamptz, ${c.id}::uuid)`);
+  }
+  const rows = await db
+    .select()
+    .from(comment)
+    .where(and(...conds))
+    .orderBy(sql`${comment.createdAt} asc`, sql`${comment.id} asc`)
+    .limit(q.limit + 1);
+  const page = toPage(rows, q.limit, (r) => ({ t: r.createdAt.toISOString(), id: r.id }));
+  const users = await getUserSummaries(db, page.items.map((r) => r.authorId));
+  const items = page.items.flatMap((r) => {
+    const author = users.get(r.authorId);
+    return author ? [toComment(r, author)] : [];
+  });
+  return { items, nextCursor: page.nextCursor };
+}
+
+export async function listLikers(
+  db: Db,
+  postId: string,
+  q: { cursor?: string; limit: number },
+) {
+  await assertPostVisible(db, postId);
+  const conds = [eq(like.postId, postId), eq(like.liked, true)];
+  if (q.cursor) {
+    const c = decodeCursor(q.cursor);
+    conds.push(sql`(${like.updatedAt}, ${like.userId}) < (${c.t}::timestamptz, ${c.id})`);
+  }
+  const rows = await db
+    .select({ userId: like.userId, updatedAt: like.updatedAt })
+    .from(like)
+    .innerJoin(user, eq(user.id, like.userId))
+    .where(and(...conds))
+    .orderBy(sql`${like.updatedAt} desc`, sql`${like.userId} desc`)
+    .limit(q.limit + 1);
+  const page = toPage(rows, q.limit, (r) => ({ t: r.updatedAt.toISOString(), id: r.userId }));
+  const users = await getUserSummaries(db, page.items.map((r) => r.userId));
+  const items = page.items.flatMap((r) => {
+    const u = users.get(r.userId);
+    return u ? [{ ...u, likedAt: r.updatedAt.toISOString() }] : [];
+  });
+  return { items, nextCursor: page.nextCursor };
 }

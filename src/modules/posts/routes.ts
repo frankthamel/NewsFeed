@@ -5,8 +5,16 @@ import { db } from '../../db/client.js';
 import { PageQuerySchema, pageSchema } from '../../lib/cursor.js';
 import { errorResponses } from '../../lib/openapi.js';
 import { UserIdParamSchema } from '../users/schemas.js';
-import { CreatePostSchema, FeedItemSchema, PostIdParamSchema } from './schemas.js';
-import { createTextPost, deletePost, listUserPosts } from './service.js';
+import {
+  CommentSchema,
+  CreatePostSchema,
+  FeedItemSchema,
+  LikerSchema,
+  PostDetailSchema,
+  PostIdParamSchema,
+  PostLookupParamSchema,
+} from './schemas.js';
+import { createTextPost, deletePost, getPostDetail, listComments, listLikers, listUserPosts } from './service.js';
 
 const security = [{ bearerAuth: [] }];
 const json = <T extends object>(schema: T) => ({ 'application/json': { schema } });
@@ -54,6 +62,48 @@ const userPostsRoute = createRoute({
   },
 });
 
+const detailRoute = createRoute({
+  method: 'get',
+  path: '/posts/{id}',
+  tags: ['Posts'],
+  summary: 'Get a post with author follower info',
+  security,
+  middleware: [requireAuth] as const,
+  request: { params: PostLookupParamSchema },
+  responses: {
+    200: { description: 'Post', content: json(PostDetailSchema) },
+    ...errorResponses(401, 404),
+  },
+});
+
+const commentsRoute = createRoute({
+  method: 'get',
+  path: '/posts/{id}/comments',
+  tags: ['Posts'],
+  summary: 'List comments, oldest first',
+  security,
+  middleware: [requireAuth] as const,
+  request: { params: PostLookupParamSchema, query: PageQuerySchema },
+  responses: {
+    200: { description: 'Page of comments', content: json(pageSchema(CommentSchema)) },
+    ...errorResponses(400, 401, 404),
+  },
+});
+
+const likesRoute = createRoute({
+  method: 'get',
+  path: '/posts/{id}/likes',
+  tags: ['Posts'],
+  summary: 'List users who like a post, newest first',
+  security,
+  middleware: [requireAuth] as const,
+  request: { params: PostLookupParamSchema, query: PageQuerySchema },
+  responses: {
+    200: { description: 'Page of likers', content: json(pageSchema(LikerSchema)) },
+    ...errorResponses(400, 401, 404),
+  },
+});
+
 export function postsRoutes() {
   const r = new OpenAPIHono<AppEnv>();
 
@@ -74,6 +124,18 @@ export function postsRoutes() {
       200,
     );
   });
+
+  r.openapi(detailRoute, async (c) =>
+    c.json(await getPostDetail(db, c.var.user.id, c.req.valid('param').id), 200),
+  );
+
+  r.openapi(commentsRoute, async (c) =>
+    c.json(await listComments(db, c.req.valid('param').id, c.req.valid('query')), 200),
+  );
+
+  r.openapi(likesRoute, async (c) =>
+    c.json(await listLikers(db, c.req.valid('param').id, c.req.valid('query')), 200),
+  );
 
   return r;
 }
