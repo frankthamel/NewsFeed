@@ -57,6 +57,20 @@ describe('decodeCursor strict validation', () => {
     );
   });
 
+  it.each([
+    ['0000-01-01T00:00:00Z', 'year 0000'],
+    ['1969-12-31T23:59:59Z', 'one second before 1970'],
+  ])('rejects out-of-range year %s (%s)', (t) => {
+    expect(() => decodeCursor(enc({ t, id: 'a' }))).toThrowError(
+      expect.objectContaining({ code: 'INVALID_CURSOR', status: 400 }),
+    );
+  });
+
+  it('accepts 9999-12-31T23:59:59Z', () => {
+    const c = { t: '9999-12-31T23:59:59Z', id: 'a' };
+    expect(decodeCursor(enc(c))).toEqual(c);
+  });
+
   it('accepts a leap day', () => {
     const c = { t: '2028-02-29T10:00:00Z', id: 'a' };
     expect(decodeCursor(enc(c))).toEqual(c);

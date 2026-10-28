@@ -28,6 +28,9 @@ export function decodeCursor(s: string): Cursor {
   const ms = Date.parse(t);
   // Round-trip: V8 rolls invalid dates over (2026-02-31 -> March 3), which Postgres rejects.
   if (Number.isNaN(ms) || new Date(ms).toISOString().slice(0, 19) !== t.slice(0, 19)) throw invalid();
+  // Postgres timestamptz rejects years outside 1970-9999 (e.g. 0000). Every real cursor is in range.
+  const year = Number(t.slice(0, 4));
+  if (year < 1970 || year > 9999) throw invalid();
   if (typeof id !== 'string' || !ID_PATTERN.test(id)) throw invalid();
 
   return { t, id };
