@@ -1,3 +1,4 @@
+import '../scripts/load-env.js';
 import { serve } from '@hono/node-server';
 import { createApp } from './app.js';
 import { env } from './env.js';
