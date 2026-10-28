@@ -2,7 +2,7 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import { swaggerUI } from '@hono/swagger-ui';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
-import { auth } from './auth/auth.js';
+import { auth, isAllowedAuthRoute } from './auth/auth.js';
 import { usersRoutes } from './modules/users/routes.js';
 import { feedRoutes } from './modules/feed/routes.js';
 import { uploadsRoutes } from './modules/uploads/routes.js';
@@ -33,7 +33,11 @@ export function createApp(): OpenAPIHono<AppEnv> {
 
   app.get('/health', (c) => c.json({ status: 'ok' }));
 
-  app.on(['GET', 'POST'], '/api/auth/*', (c) => auth.handler(c.req.raw));
+  // Only the documented Better Auth endpoints are reachable; the rest are 404.
+  app.on(['GET', 'POST'], '/api/auth/*', (c): Response | Promise<Response> => {
+    if (!isAllowedAuthRoute(c.req.method, c.req.path.slice('/api/auth'.length))) return onNotFound(c);
+    return auth.handler(c.req.raw);
+  });
 
   app.route('/api/v1', usersRoutes());
   // Uploads first so /posts/uploads/... can never be shadowed by a /posts/:id route.
@@ -57,9 +61,10 @@ export function createApp(): OpenAPIHono<AppEnv> {
     for (const [path, item] of Object.entries(spec.paths ?? {})) {
       const tagged: Record<string, unknown> = {};
       for (const [method, op] of Object.entries(item)) {
+        if (!isAllowedAuthRoute(method, path)) continue;
         tagged[method] = op && typeof op === 'object' ? { ...op, tags: ['Auth'] } : op;
       }
-      paths[`/api/auth${path}`] = tagged;
+      if (Object.keys(tagged).length > 0) paths[`/api/auth${path}`] = tagged;
     }
     return c.json(doc);
   });

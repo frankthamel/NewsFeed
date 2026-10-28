@@ -45,8 +45,13 @@ The seed creates `demo1@newsfeed.dev` ... `demoN@newsfeed.dev` (usernames `demo1
 
 ## Authenticating
 
-Auth is [Better Auth](https://www.better-auth.com) mounted at `/api/auth/*`. Sign-up requires a `username`
-(Better Auth lowercases it).
+Auth is [Better Auth](https://www.better-auth.com) mounted at `/api/auth/*`. Only four of its endpoints are
+exposed: `POST /sign-up/email`, `POST /sign-in/email`, `POST /sign-out` and `GET /get-session`; every other
+`/api/auth/*` path returns 404. Profile changes go through `PATCH /api/v1/me` and the avatar upload flow.
+
+Sign-up requires `email`, `password`, `name` (1-60 characters) and `username`. The username is lowercased,
+then must match `^[a-z0-9_]{3,30}$` (the same rule as `PATCH /me`). `bio` and `image` are rejected at sign-up
+with 400; set them later with `PATCH /me` and the avatar flow.
 
 ```bash
 # Sign up
