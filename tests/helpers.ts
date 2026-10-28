@@ -62,3 +62,30 @@ export async function follow(followerToken: string, followeeId: string): Promise
   const r = await req('PUT', `/api/v1/users/${followeeId}/follow`, { token: followerToken });
   if (r.status !== 200) throw new Error(`follow failed: ${r.status} ${JSON.stringify(r.body)}`);
 }
+
+/** PUT each buffer to its presigned URL (in order of `start.uploads`). */
+export async function uploadFiles(
+  start: { uploads: { url: string; headers: Record<string, string> }[] },
+  buffers: (Buffer | null)[],
+): Promise<void> {
+  for (let i = 0; i < start.uploads.length; i++) {
+    const buf = buffers[i];
+    if (!buf) continue;
+    const u = start.uploads[i]!;
+    const res = await fetch(u.url, { method: 'PUT', headers: u.headers, body: new Uint8Array(buf) });
+    if (res.status !== 200) throw new Error(`upload ${i} failed: ${res.status}`);
+  }
+}
+
+/** Test-only: write an object straight to storage, bypassing presigned constraints. */
+export async function putObjectRaw(key: string, contentType: string, body: Buffer): Promise<void> {
+  const { PutObjectCommand, S3Client } = await import('@aws-sdk/client-s3');
+  const { env } = await import('../src/env.js');
+  const s3 = new S3Client({
+    endpoint: env.S3_ENDPOINT,
+    region: env.S3_REGION,
+    forcePathStyle: true,
+    credentials: { accessKeyId: env.S3_ACCESS_KEY, secretAccessKey: env.S3_SECRET_KEY },
+  });
+  await s3.send(new PutObjectCommand({ Bucket: env.S3_BUCKET, Key: key, ContentType: contentType, Body: body }));
+}
