@@ -57,8 +57,8 @@ export async function signUp(
   return { token, user: { id: r.body.user.id, username: r.body.user.username, name: r.body.user.name } };
 }
 
-/** Make the token's owner follow `followeeId` (direct insert until Task 6 adds the API). */
+/** Make the token's owner follow `followeeId` through the API. */
 export async function follow(followerToken: string, followeeId: string): Promise<void> {
-  const me = await req('GET', '/api/v1/me', { token: followerToken });
-  await db.insert(followTable).values({ followerId: me.body.id, followeeId }).onConflictDoNothing();
+  const r = await req('PUT', `/api/v1/users/${followeeId}/follow`, { token: followerToken });
+  if (r.status !== 200) throw new Error(`follow failed: ${r.status} ${JSON.stringify(r.body)}`);
 }
