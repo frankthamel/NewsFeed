@@ -1,5 +1,6 @@
 import { createApp } from '../src/app.js';
-import { pool } from '../src/db/client.js';
+import { db, pool } from '../src/db/client.js';
+import { follow as followTable } from '../src/db/schema.js';
 
 export const app = createApp();
 
@@ -54,4 +55,10 @@ export async function signUp(
   const token = r.headers.get('set-auth-token');
   if (!token) throw new Error('signUp: no set-auth-token header');
   return { token, user: { id: r.body.user.id, username: r.body.user.username, name: r.body.user.name } };
+}
+
+/** Make the token's owner follow `followeeId` (direct insert until Task 6 adds the API). */
+export async function follow(followerToken: string, followeeId: string): Promise<void> {
+  const me = await req('GET', '/api/v1/me', { token: followerToken });
+  await db.insert(followTable).values({ followerId: me.body.id, followeeId }).onConflictDoNothing();
 }

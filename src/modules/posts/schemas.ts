@@ -1,0 +1,58 @@
+import { z } from '@hono/zod-openapi';
+import { UserSummarySchema } from '../users/schemas.js';
+
+export const MediaSchema = z
+  .object({
+    id: z.string(),
+    kind: z.enum(['image', 'video', 'thumbnail']),
+    url: z.string(),
+    contentType: z.string(),
+    sizeBytes: z.number().int(),
+    width: z.number().int().nullable(),
+    height: z.number().int().nullable(),
+    durationSec: z.number().nullable(),
+    position: z.number().int(),
+  })
+  .openapi('Media');
+export type Media = z.infer<typeof MediaSchema>;
+
+export const CommentSchema = z
+  .object({
+    id: z.string(),
+    postId: z.string(),
+    author: UserSummarySchema,
+    text: z.string(),
+    version: z.number().int(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+    edited: z.boolean(),
+  })
+  .openapi('Comment');
+export type Comment = z.infer<typeof CommentSchema>;
+
+export const FeedItemSchema = z
+  .object({
+    id: z.string(),
+    type: z.enum(['text', 'image', 'video']),
+    text: z.string().nullable(),
+    author: UserSummarySchema,
+    media: z.array(MediaSchema),
+    likeCount: z.number().int(),
+    commentCount: z.number().int(),
+    likedByMe: z.boolean(),
+    latestComments: z.array(CommentSchema),
+    version: z.number().int(),
+    createdAt: z.string(),
+  })
+  .openapi('FeedItem');
+export type FeedItem = z.infer<typeof FeedItemSchema>;
+
+export const CreatePostSchema = z
+  .object({
+    type: z.literal('text'),
+    text: z.string().min(1).max(5000),
+    clientOpId: z.string().uuid().optional(),
+  })
+  .openapi('CreatePost');
+
+export const PostIdParamSchema = z.object({ id: z.string().uuid() });

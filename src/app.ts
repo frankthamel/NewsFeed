@@ -4,6 +4,8 @@ import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { auth } from './auth/auth.js';
 import { usersRoutes } from './modules/users/routes.js';
+import { feedRoutes } from './modules/feed/routes.js';
+import { postsRoutes } from './modules/posts/routes.js';
 import { onError, onNotFound, validationHook } from './lib/errors.js';
 
 export type AuthUser = { id: string; username: string; name: string };
@@ -30,6 +32,8 @@ export function createApp(): OpenAPIHono<AppEnv> {
   app.on(['GET', 'POST'], '/api/auth/*', (c) => auth.handler(c.req.raw));
 
   app.route('/api/v1', usersRoutes());
+  app.route('/api/v1', postsRoutes());
+  app.route('/api/v1', feedRoutes());
 
   type AuthSpec = { paths?: Record<string, Record<string, unknown>> };
   let authSpec: Promise<AuthSpec> | undefined;
