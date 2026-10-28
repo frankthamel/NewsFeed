@@ -16,37 +16,41 @@ services:
       timeout: 3s
       retries: 20
 
-  minio:
-    image: minio/minio
-    command: server /data --console-address :9001
+  storage:
+    image: rustfs/rustfs:1.0.4
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      RUSTFS_ACCESS_KEY: rustfsadmin
+      RUSTFS_SECRET_KEY: rustfsadmin
+      RUSTFS_CONSOLE_ENABLE: "true"
     ports:
       - "9000:9000"
       - "9001:9001"
     volumes:
-      - miniodata:/data
+      - storagedata:/data
     healthcheck:
-      test: ["CMD-SHELL", "mc ready local || curl -fs http://localhost:9000/minio/health/live"]
+      test: ["CMD-SHELL", "curl -fs http://localhost:9000/health || wget -qO- http://localhost:9000/health"]
       interval: 3s
       timeout: 3s
-      retries: 20
+      retries: 30
 
-  minio-init:
-    image: minio/mc
+  storage-init:
+    image: amazon/aws-cli
     depends_on:
-      minio:
+      storage:
         condition: service_healthy
     restart: "no"
-    entrypoint: >
-      /bin/sh -c "
-      until mc alias set local http://minio:9000 minioadmin minioadmin; do sleep 1; done;
-      mc mb -p local/newsfeed-media;
-      mc anonymous set download local/newsfeed-media;
-      exit 0;
-      "
+    environment:
+      AWS_ACCESS_KEY_ID: rustfsadmin
+      AWS_SECRET_ACCESS_KEY: rustfsadmin
+      AWS_DEFAULT_REGION: us-east-1
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        E="--endpoint-url http://storage:9000"
+        until aws $$E s3api list-buckets >/dev/null 2>&1; do sleep 1; done
+        aws $$E s3api create-bucket --bucket newsfeed-media 2>&1 || aws $$E s3api head-bucket --bucket newsfeed-media
+        aws $$E s3api put-bucket-policy --bucket newsfeed-media --policy '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":["s3:GetObject"],"Resource":["arn:aws:s3:::newsfeed-media/*"]}]}'
 
 volumes:
   pgdata:
-  miniodata:
+  storagedata:
