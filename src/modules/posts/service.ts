@@ -9,7 +9,7 @@ import { getUserProfile, getUserSummaries } from '../users/service.js';
 import type { FeedItem, PostDetail } from './schemas.js';
 import { serializePosts, toComment } from './serialize.js';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Decode a cursor whose id is compared against a uuid column. */
 export function decodeUuidCursor(s: string): Cursor {
