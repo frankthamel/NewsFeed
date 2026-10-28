@@ -21,11 +21,24 @@ async function emptyBucket(): Promise<number> {
   return removed;
 }
 
-/** Drop everything (schemas `public` and `drizzle`), re-run migrations and empty the media bucket. */
-export async function resetDatabase(): Promise<void> {
-  if (process.env.NODE_ENV === 'production') {
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
+
+/** Throws unless wiping the target database is acceptable. Pure: touches nothing. */
+export function assertResetAllowed(databaseUrl: string, nodeEnv?: string, allowFlag?: string): void {
+  if (nodeEnv === 'production') {
     throw new Error('Refusing to reset the database: NODE_ENV is "production".');
   }
+  const host = new URL(databaseUrl).hostname;
+  if (!LOCAL_HOSTS.has(host) && allowFlag !== '1') {
+    throw new Error(
+      `Refusing to reset the database: host "${host}" is not local. Set ALLOW_DB_RESET=1 to override.`,
+    );
+  }
+}
+
+/** Drop everything (schemas `public` and `drizzle`), re-run migrations and empty the media bucket. */
+export async function resetDatabase(): Promise<void> {
+  assertResetAllowed(env.DATABASE_URL, process.env.NODE_ENV, process.env.ALLOW_DB_RESET);
   await pool.query('DROP SCHEMA IF EXISTS public CASCADE');
   await pool.query('DROP SCHEMA IF EXISTS drizzle CASCADE');
   await pool.query('CREATE SCHEMA public');
